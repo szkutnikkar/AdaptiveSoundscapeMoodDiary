@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#121212">
+
+    <LinearLayout
+        android:id="@+id/mainContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <!-- Ostatni wpis -->
+        <LinearLayout
+            android:id="@+id/lastEntryContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/card_background"
+            android:padding="16dp"
+            android:layout_marginBottom="24dp">
+
+            <TextView
+                android:id="@+id/lastEntryTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Ostatni wpis"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:textColor="#FFFFFF"/>
+
+            <ImageView
+                android:id="@+id/lastEntryImage"
+                android:layout_width="120dp"
+                android:layout_height="120dp"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="8dp"
+                android:scaleType="centerCrop"/>
+
+            <TextView
+                android:id="@+id/lastEntryDate"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:textColor="#CCCCCC"/>
+
+            <TextView
+                android:id="@+id/lastEntryMood"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:textStyle="bold"
+                android:textColor="#CCCCCC"/>
+
+            <TextView
+                android:id="@+id/lastEntrySong"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:textColor="#CCCCCC"/>
+        </LinearLayout>
+
+        <!-- Wynik ankiety -->
+        <LinearLayout
+            android:id="@+id/resultContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/resultTextView"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:textColor="#FFFFFF"
+                android:layout_marginBottom="16dp" />
+
+            <Button
+                android:id="@+id/restartButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Wypełnij ponownie" />
+        </LinearLayout>
+
+        <!-- Start ankiety -->
+        <Button
+            android:id="@+id/startQuestionnaireButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Rozpocznij nową ankietę"
+            android:layout_marginTop="16dp"/>
+
+        <!-- Kontener pytań -->
+        <LinearLayout
+            android:id="@+id/questionnaireContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/questionTextView"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="#FFFFFF"/>
+
+            <RadioGroup
+                android:id="@+id/answerRadioGroup"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp">
+
+                <RadioButton
+                    android:id="@+id/option1"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="1 - Najniższa"
+                    android:textColor="#FFFFFF"/>
+                <RadioButton
+                    android:id="@+id/option2"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="2"
+                    android:textColor="#FFFFFF"/>
+                <RadioButton
+                    android:id="@+id/option3"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="3"
+                    android:textColor="#FFFFFF"/>
+                <RadioButton
+                    android:id="@+id/option4"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="4"
+                    android:textColor="#FFFFFF"/>
+                <RadioButton
+                    android:id="@+id/option5"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="5 - Najwyższa"
+                    android:textColor="#FFFFFF"/>
+            </RadioGroup>
+
+            <Button
+                android:id="@+id/nextButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:text="Następne pytanie"/>
+        </LinearLayout>
+
+        <!-- Selfie -->
+        <Button
+            android:id="@+id/takePhotoButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Dodaj selfie (opcjonalnie)"/>
+
+        <ImageView
+            android:id="@+id/selfieImageView"
+            android:layout_width="150dp"
+            android:layout_height="150dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="16dp"
+            android:visibility="gone"/>
+
+        <TextView
+            android:id="@+id/emotionTextView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="8dp"
+            android:text=""
+            android:textColor="#FFFFFF"
+            android:textSize="16sp"
+            android:visibility="gone" />
+
+        <!-- Historia -->
+        <Button
+            android:id="@+id/viewHistoryButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="Historia wpisów"/>
+    </LinearLayout>
+</ScrollView>
