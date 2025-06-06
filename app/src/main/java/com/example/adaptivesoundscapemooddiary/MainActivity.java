@@ -2,7 +2,10 @@ package com.example.adaptivesoundscapemooddiary;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.room.Room;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Bundle;
@@ -15,8 +18,12 @@ import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.app.AlertDialog;
+import android.widget.ImageButton;
 
 import com.github.dhaval2404.imagepicker.ImagePicker;
+import com.google.android.material.button.MaterialButton;
+import com.google.android.material.card.MaterialCardView;
 
 import java.io.IOException;
 import java.text.DateFormat;
@@ -29,6 +36,7 @@ public class MainActivity extends AppCompatActivity {
     private TextView emotionTextView, questionTextView, resultTextView;
     private FaceEmotionDetector faceEmotionDetector;
     private String detectedEmotion = "Nie wykryto";
+    private BroadcastReceiver databaseChangeReceiver;
 
     private RadioGroup answerRadioGroup;
     private Button nextButton, takePhotoButton, restartButton, viewHistoryButton;
@@ -48,173 +56,326 @@ public class MainActivity extends AppCompatActivity {
     private AppDatabase db;
 
     private String[] questions = {
-            "Jak się dziś czujesz w skali 1-5?",
-            "Jak oceniasz swój poziom stresu? (1-niski, 5-wysoki)",
-            "Jak oceniasz jakość swojego snu?",
-            "Czy masz dziś dużo energii?",
-            "Jak oceniasz swoją produktywność?"
+            "Jak się dziś czujesz?",
+            "Co najlepiej opisuje Twój dzisiejszy poziom energii?",
+            "Jak oceniasz swoją motywację do działania?",
+            "Które zdanie najlepiej opisuje Twoje myśli?",
+            "Jak spałeś/aś ostatniej nocy?"
     };
 
+    private String[][] answers = {
+            {"Świetnie!", "Dobrze", "Neutralnie", "Nie najlepiej", "Źle"},
+            {"Pełen/na energii", "Dość energiczny/a", "Normalnie", "Trochę zmęczony/a", "Bardzo zmęczony/a"},
+            {"Chcę góry przenosić!", "Mam chęć do działania", "Jest OK", "Trudno się zmotywować", "Brak motywacji"},
+            {"Pozytywne i pełne nadziei", "Spokojne i zrównoważone", "Neutralne", "Lekko niepokojące", "Negatywne i przygnębiające"},
+            {"Świetnie, jestem wypoczęty/a", "Całkiem dobrze", "Przeciętnie", "Słabo", "Bardzo źle"}
+    };
+
+    private int[] answerScores = {2, 1, 0, -1, -2}; // Punktacja dla każdej odpowiedzi
+
     private static final Map<String, SpotifyTrack> MOOD_TO_SPOTIFY = new HashMap<String, SpotifyTrack>() {{
-        put("szczęśliwy", new SpotifyTrack("spotify:track:5Q0Nhxo0l2bP3pNjpGJwV1", "Happy - Pharrell Williams"));
-        put("smutny", new SpotifyTrack("spotify:track:6rqhFgbbKwnb9MLmUQDhG6", "Someone Like You - Adele"));
-        put("zestresowany", new SpotifyTrack("spotify:track:1DkL3Z4Y6SUTgZYe9XUYQq", "Weightless - Marconi Union"));
-        put("spokojny", new SpotifyTrack("spotify:track:3H6f6iIZWYg7mWbeJZ6v5b", "River Flows In You - Yiruma"));
-        put("zmęczony", new SpotifyTrack("spotify:track:3KA0hL8hQZd9uzvo3JfEbX", "Starboy - The Weeknd"));
+        // Podstawowe nastroje
+        put("szczęśliwy/a", new SpotifyTrack("spotify:track:60nZcImufyMA1MKQY3dcCH", "Happy - Pharrell Williams"));
+        put("bardzo szczęśliwy/a", new SpotifyTrack("spotify:track:60nZcImufyMA1MKQY3dcCH", "Happy - Pharrell Williams"));
+        put("smutny/a", new SpotifyTrack("spotify:track:3ee8Jmje8o58CHK66QrVC2", "Sad! - XXXTENTACION"));
+        put("wyraźnie smutny/a", new SpotifyTrack("spotify:track:3ee8Jmje8o58CHK66QrVC2", "Sad! - XXXTENTACION"));
+        put("zestresowany/a", new SpotifyTrack("spotify:track:3SXzmfGtwCdFkms7gEdHC2", "Cry OF The Unheard - REPULSIVE"));
+        put("spokojny/a", new SpotifyTrack("spotify:track:5F3qrwxuHSz88vXBGh3tNy", "Interstellar - Calmly"));
+        put("zmęczony/a", new SpotifyTrack("spotify:track:7H0ya83CMmgFcOhw0UB6ow", "Space Song - Beach House"));
+        put("zły/a", new SpotifyTrack("spotify:track:5cZqsjVs6MevCnAkasbEOX?", "Break Stuff - Limp Bizkit"));
+        put("bardzo zły/a", new SpotifyTrack("spotify:track:5cZqsjVs6MevCnAkasbEOX?", "Break Stuff - Limp Bizkit"));
+        put("neutralny/a", new SpotifyTrack("spotify:track:6kkwzB6hXLIONkEk9JciA6?", "Weightless - Marconi Union"));
+        put("stabilny/a neutralny/a", new SpotifyTrack("spotify:track:6kkwzB6hXLIONkEk9JciA6?", "Weightless - Marconi Union"));
     }};
+
+    // Add new card view references
+    private MaterialCardView questionnaireCard;
+    private MaterialCardView resultCard;
+    private MaterialCardView lastEntryCard;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        db = Room.databaseBuilder(getApplicationContext(),
-                AppDatabase.class, "mood-diary-db").build();
+        initializeViews();
+        setupDatabase();
+        setupListeners();
+        setupDatabaseChangeReceiver();
+        loadLastEntry();
+    }
 
+    private void initializeViews() {
         // Inicjalizacja widoków
         faceEmotionDetector = new FaceEmotionDetector();
+        
+        // Initialize card views
+        questionnaireCard = findViewById(R.id.questionnaireCard);
+        resultCard = findViewById(R.id.resultCard);
+        lastEntryCard = findViewById(R.id.lastEntryCard);
+        
+        // Główne widoki
         questionTextView = findViewById(R.id.questionTextView);
         answerRadioGroup = findViewById(R.id.answerRadioGroup);
         nextButton = findViewById(R.id.nextButton);
         takePhotoButton = findViewById(R.id.takePhotoButton);
         selfieImageView = findViewById(R.id.selfieImageView);
+        emotionTextView = findViewById(R.id.emotionTextView);
+        
+        // Dodaj obsługę przycisku zamykania
+        ImageButton closeButton = findViewById(R.id.closeButton);
+        closeButton.setOnClickListener(v -> showExitConfirmationDialog());
+        
+        // Kontenery
         questionnaireContainer = findViewById(R.id.questionnaireContainer);
         resultContainer = findViewById(R.id.resultContainer);
-        resultTextView = findViewById(R.id.resultTextView);
-        restartButton = findViewById(R.id.restartButton);
-        viewHistoryButton = findViewById(R.id.viewHistoryButton);
-        emotionTextView = findViewById(R.id.emotionTextView);
+        lastEntryContainer = findViewById(R.id.lastEntryContainer);
+        
+        // Przyciski
         startQuestionnaireButton = findViewById(R.id.startQuestionnaireButton);
         restartButton = findViewById(R.id.restartButton);
-        questionnaireContainer = findViewById(R.id.questionnaireContainer);
-        resultContainer = findViewById(R.id.resultContainer);
-
-        lastEntryContainer = findViewById(R.id.lastEntryContainer);
+        viewHistoryButton = findViewById(R.id.viewHistoryButton);
+        
+        // Teksty wyników
+        resultTextView = findViewById(R.id.resultTextView);
         lastEntryImage = findViewById(R.id.lastEntryImage);
         lastEntryDate = findViewById(R.id.lastEntryDate);
         lastEntryMood = findViewById(R.id.lastEntryMood);
         lastEntrySong = findViewById(R.id.lastEntrySong);
-        startQuestionnaireButton = findViewById(R.id.startQuestionnaireButton);
 
-        questionnaireContainer.setVisibility(View.GONE);
-        resultContainer.setVisibility(View.GONE);
+        // Ustawienie początkowej widoczności
+        questionnaireCard.setVisibility(View.GONE);
+        resultCard.setVisibility(View.GONE);
+        questionnaireContainer.setVisibility(View.VISIBLE);
+        resultContainer.setVisibility(View.VISIBLE);
+        startQuestionnaireButton.setVisibility(View.VISIBLE);
+    }
 
-        loadLastEntry();
+    private void setupDatabase() {
+        db = Room.databaseBuilder(getApplicationContext(),
+                AppDatabase.class, "mood-diary-db")
+                .fallbackToDestructiveMigration()
+                .build();
+    }
 
-        startQuestionnaireButton.setOnClickListener(v -> {
-            questionnaireContainer.setVisibility(View.VISIBLE);
-            startQuestionnaireButton.setVisibility(View.GONE); // ukryj przycisk po rozpoczęciu
-            resultContainer.setVisibility(View.GONE);
-        });
-
-        showQuestion(currentQuestion);
-
-        nextButton.setOnClickListener(v -> {
-            int selectedId = answerRadioGroup.getCheckedRadioButtonId();
-            if (selectedId == -1) {
-                Toast.makeText(this, "Wybierz odpowiedź", Toast.LENGTH_SHORT).show();
-                return;
-            }
-
-            int answerValue = 0;
-            if (selectedId == R.id.option1) answerValue = 1;
-            else if (selectedId == R.id.option2) answerValue = 2;
-            else if (selectedId == R.id.option3) answerValue = 3;
-            else if (selectedId == R.id.option4) answerValue = 4;
-            else if (selectedId == R.id.option5) answerValue = 5;
-
-            totalScore += answerValue;
-
-            if (currentQuestion < questions.length - 1) {
-                currentQuestion++;
-                showQuestion(currentQuestion);
-                answerRadioGroup.clearCheck();
-            } else {
-                finishQuestionnaire();
-            }
-        });
-
-        takePhotoButton.setOnClickListener(v -> {
-            ImagePicker.with(MainActivity.this)
-                    .crop()
-                    .compress(1024)
-                    .maxResultSize(1080, 1080)
-                    .start();
-        });
-
+    private void setupListeners() {
+        startQuestionnaireButton.setOnClickListener(v -> startQuestionnaire());
+        nextButton.setOnClickListener(v -> handleNextQuestion());
+        takePhotoButton.setOnClickListener(v -> takeSelfie());
         restartButton.setOnClickListener(v -> resetQuestionnaire());
+        viewHistoryButton.setOnClickListener(v -> openHistory());
+    }
 
-        viewHistoryButton.setOnClickListener(v -> {
-            startActivity(new Intent(this, HistoryActivity.class));
-        });
+    private void setupDatabaseChangeReceiver() {
+        databaseChangeReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                if ("com.example.adaptivesoundscapemooddiary.DATABASE_CHANGED".equals(intent.getAction())) {
+                    loadLastEntry();
+                }
+            }
+        };
+        registerReceiver(databaseChangeReceiver, new IntentFilter("com.example.adaptivesoundscapemooddiary.DATABASE_CHANGED"));
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (databaseChangeReceiver != null) {
+            unregisterReceiver(databaseChangeReceiver);
+        }
+    }
+
+    private void startQuestionnaire() {
+        currentQuestion = 0;
+        totalScore = 0;
+        answerRadioGroup.clearCheck();
+        
+        // Pokaż kartę z ankietą
+        questionnaireCard.setVisibility(View.VISIBLE);
+        questionnaireContainer.setVisibility(View.VISIBLE);
+        takePhotoButton.setVisibility(View.VISIBLE);
+        
+        // Ukryj pozostałe elementy
+        startQuestionnaireButton.setVisibility(View.GONE);
+        resultCard.setVisibility(View.GONE);
+        
+        // Pokaż pierwsze pytanie
+        showQuestion(currentQuestion);
+    }
+
+    private void handleNextQuestion() {
+        int selectedId = answerRadioGroup.getCheckedRadioButtonId();
+        if (selectedId == -1) {
+            Toast.makeText(this, "Wybierz odpowiedź", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        int answerIndex = 0;
+        if (selectedId == R.id.option1) answerIndex = 0;
+        else if (selectedId == R.id.option2) answerIndex = 1;
+        else if (selectedId == R.id.option3) answerIndex = 2;
+        else if (selectedId == R.id.option4) answerIndex = 3;
+        else if (selectedId == R.id.option5) answerIndex = 4;
+
+        totalScore += answerScores[answerIndex];
+
+        if (currentQuestion < questions.length - 1) {
+            currentQuestion++;
+            showQuestion(currentQuestion);
+            answerRadioGroup.clearCheck();
+        } else {
+            finishQuestionnaire();
+        }
+    }
+
+    private void takeSelfie() {
+        ImagePicker.with(MainActivity.this)
+                .crop()
+                .compress(1024)
+                .maxResultSize(1080, 1080)
+                .start();
+    }
+
+    private void openHistory() {
+        startActivity(new Intent(this, HistoryActivity.class));
     }
 
     private void showQuestion(int questionIndex) {
-        // Dodaj zabezpieczenie przed przekroczeniem zakresu
         if (questionIndex < 0 || questionIndex >= questions.length) {
             Toast.makeText(this, "Błąd: Nieprawidłowy indeks pytania", Toast.LENGTH_SHORT).show();
             return;
         }
 
+        // Ustaw tekst pytania
         questionTextView.setText(questions[questionIndex]);
 
+        // Znajdź przyciski radiowe
         RadioButton option1 = findViewById(R.id.option1);
         RadioButton option2 = findViewById(R.id.option2);
         RadioButton option3 = findViewById(R.id.option3);
         RadioButton option4 = findViewById(R.id.option4);
         RadioButton option5 = findViewById(R.id.option5);
 
-        // Dodaj sprawdzenie nulli dla RadioButtons
+        // Ustaw odpowiednie etykiety dla przycisków
         if (option1 != null && option2 != null && option3 != null && option4 != null && option5 != null) {
-            if (questionIndex == 1) {
-                option1.setText("1 - Niski");
-                option5.setText("5 - Wysoki");
-            } else {
-                option1.setText("1");
-                option5.setText("5");
-            }
+            option1.setText(answers[questionIndex][0]);
+            option2.setText(answers[questionIndex][1]);
+            option3.setText(answers[questionIndex][2]);
+            option4.setText(answers[questionIndex][3]);
+            option5.setText(answers[questionIndex][4]);
         }
 
+        // Aktualizuj tekst przycisku
         nextButton.setText(questionIndex == questions.length - 1 ? "Zakończ ankietę" : "Następne pytanie");
     }
 
+    private void showResult(String mood, int score) {
+        // Ukryj niepotrzebne elementy
+        selfieImageView.setVisibility(View.GONE);
+        questionnaireContainer.setVisibility(View.GONE);
+        questionnaireCard.setVisibility(View.GONE);
+        startQuestionnaireButton.setVisibility(View.GONE);
+
+        // Pokaż wyniki
+        resultCard.setVisibility(View.VISIBLE);
+        resultContainer.setVisibility(View.VISIBLE);
+        resultTextView.setText("Twój nastrój: " + mood);
+        
+        // Upewnij się, że przycisk do ponownego wypełnienia jest widoczny
+        restartButton.setVisibility(View.VISIBLE);
+    }
+
+    private void resetQuestionnaire() {
+        // Ukryj karty
+        questionnaireCard.setVisibility(View.GONE);
+        resultCard.setVisibility(View.GONE);
+        takePhotoButton.setVisibility(View.GONE);
+        
+        // Pokaż przycisk rozpoczęcia
+        startQuestionnaireButton.setVisibility(View.VISIBLE);
+        
+        // Reset zmiennych
+        currentQuestion = 0;
+        totalScore = 0;
+        selfieUri = null;
+        detectedEmotion = "Nie wykryto";
+        
+        // Wyczyść widoki
+        selfieImageView.setVisibility(View.GONE);
+        emotionTextView.setVisibility(View.GONE);
+        emotionTextView.setText("");
+        resultContainer.setVisibility(View.GONE);
+        answerRadioGroup.clearCheck();
+        
+        // Ukryj ostatni wpis i wyczyść jego zawartość
+        lastEntryContainer.setVisibility(View.GONE);
+        lastEntryDate.setText("");
+        lastEntryMood.setText("");
+        lastEntrySong.setText("");
+        lastEntryImage.setImageURI(null);
+        lastEntryImage.setVisibility(View.GONE);
+        
+        // Załaduj ostatni wpis tylko jeśli istnieje w bazie
+        loadLastEntry();
+    }
+
     private void finishQuestionnaire() {
-        if (questions.length == 0 || totalScore < 0) {
-            Toast.makeText(this, "Błąd obliczania wyniku", Toast.LENGTH_SHORT).show();
+        if (questions.length == 0) {
+            Toast.makeText(this, "Błąd: brak pytań", Toast.LENGTH_SHORT).show();
             return;
         }
         String detectedMood = analyzeMood(totalScore);
         String finalMood = combineMoods(detectedMood, detectedEmotion);
-
-        SpotifyTrack spotifyTrack = MOOD_TO_SPOTIFY.getOrDefault(detectedMood.toLowerCase(),
-                new SpotifyTrack("spotify:track:0Dg5BZ2tkBUkUYIMWbc4wG", "Default Track"));
+        
+        // Szukamy piosenki najpierw dla pełnego nastroju
+        String searchMood = finalMood.toLowerCase();
+        final SpotifyTrack finalSpotifyTrack;
+        SpotifyTrack spotifyTrack = MOOD_TO_SPOTIFY.get(searchMood);
+        
+        // Jeśli nie znaleziono, szukamy dla podstawowego nastroju
+        if (spotifyTrack == null) {
+            spotifyTrack = MOOD_TO_SPOTIFY.get(detectedMood.toLowerCase());
+        }
+        
+        // Jeśli nadal nie znaleziono, używamy domyślnej piosenki
+        if (spotifyTrack == null) {
+            spotifyTrack = new SpotifyTrack("spotify:track:0Dg5BZ2tkBUkUYIMWbc4wG", "Default Track");
+        }
+        
+        finalSpotifyTrack = spotifyTrack;
 
         MoodEntry newEntry = new MoodEntry(
                 new Date(),
-                "Wynik: " + totalScore + "/25",
+                "",  // Usuwamy wynik punktowy
                 finalMood,
                 selfieUri,
-                spotifyTrack.uri,
-                spotifyTrack.trackName
+                finalSpotifyTrack.uri,
+                finalSpotifyTrack.trackName
         );
 
         new Thread(() -> {
             db.moodEntryDao().insert(newEntry);
 
             runOnUiThread(() -> {
-                // Ukryj komunikat o emocji
+                // Ukryj elementy ankiety
                 emotionTextView.setVisibility(View.GONE);
                 emotionTextView.setText("");
+                selfieImageView.setVisibility(View.GONE);
+                questionnaireContainer.setVisibility(View.GONE);
+                questionnaireCard.setVisibility(View.GONE);
+                startQuestionnaireButton.setVisibility(View.GONE);
+                takePhotoButton.setVisibility(View.GONE);
 
+                // Pokaż wyniki
                 showResult(detectedMood, totalScore);
+                
+                // Załaduj i pokaż ostatni wpis
                 loadLastEntry();
                 lastEntryContainer.setVisibility(View.VISIBLE);
 
-                // Ukryj "Rozpocznij nową ankietę" — zostaw tylko "Wypełnij ponownie"
-                startQuestionnaireButton.setVisibility(View.GONE);
-
                 try {
-                    startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(spotifyTrack.uri)));
+                    startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(finalSpotifyTrack.uri)));
                 } catch (Exception e) {
                     Toast.makeText(this, "Błąd przy otwieraniu Spotify", Toast.LENGTH_SHORT).show();
                 }
@@ -222,42 +383,13 @@ public class MainActivity extends AppCompatActivity {
         }).start();
     }
 
-    private void showResult(String mood, int score) {
-        selfieImageView.setVisibility(View.GONE);
-        questionnaireContainer.setVisibility(View.GONE);
-        resultContainer.setVisibility(View.VISIBLE);
-        resultTextView.setText("Twój nastrój: " + mood + "\nWynik: " + score + "/25");
-    }
-
-    private void resetQuestionnaire() {
-        currentQuestion = 0;
-        totalScore = 0;
-        selfieUri = null;
-        selfieImageView.setVisibility(View.GONE);
-        detectedEmotion = "Nie wykryto";
-
-        if (emotionTextView != null) {
-            emotionTextView.setVisibility(View.GONE);
-            emotionTextView.setText("");
-        }
-
-        resultContainer.setVisibility(View.GONE);
-        questionnaireContainer.setVisibility(View.VISIBLE);
-        showQuestion(currentQuestion);
-        answerRadioGroup.clearCheck();
-
-        lastEntryContainer.setVisibility(View.GONE);
-        startQuestionnaireButton.setVisibility(View.GONE);
-    }
-
-
-
     private String analyzeMood(int score) {
-        if (score >= 20) return "szczęśliwy";
-        else if (score >= 15) return "spokojny";
-        else if (score >= 10) return "neutralny";
-        else if (score >= 5) return "smutny";
-        else return "zestresowany";
+        if (score >= 7) return "szczęśliwy/a";
+        else if (score >= 4) return "spokojny/a";
+        else if (score >= 0) return "neutralny/a";
+        else if (score >= -4) return "smutny/a";
+        else if (score >= -7) return "zły/a";
+        else return "zestresowany/a";
     }
 
     private void loadLastEntry() {
@@ -268,7 +400,7 @@ public class MainActivity extends AppCompatActivity {
                     String dateText = lastEntry.getDate() != null ?
                             DateFormat.getDateInstance().format(lastEntry.getDate()) : "Brak daty";
                     lastEntryDate.setText("Data: " + dateText);
-                    lastEntryMood.setText("Nastrój: " + lastEntry.getDetectedMood());  // lub getMoodText(), zależnie co chcesz
+                    lastEntryMood.setText("Nastrój: " + lastEntry.getDetectedMood());
                     lastEntrySong.setText("Utwór: " + lastEntry.getSpotifyTrackName());
 
                     if (lastEntry.getSelfieUri() != null) {
@@ -278,8 +410,20 @@ public class MainActivity extends AppCompatActivity {
                         lastEntryImage.setVisibility(View.GONE);
                     }
                     lastEntryContainer.setVisibility(View.VISIBLE);
+                    lastEntryCard.setVisibility(View.VISIBLE);
+                    // Show start button only if result card is not visible
+                    startQuestionnaireButton.setVisibility(resultCard.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE);
                 } else {
                     lastEntryContainer.setVisibility(View.GONE);
+                    lastEntryCard.setVisibility(View.GONE);
+                    // Only show start button if we're not in the result view
+                    startQuestionnaireButton.setVisibility(resultCard.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE);
+                    // Reset all text views to prevent showing old data
+                    lastEntryDate.setText("");
+                    lastEntryMood.setText("");
+                    lastEntrySong.setText("");
+                    lastEntryImage.setImageURI(null);
+                    lastEntryImage.setVisibility(View.GONE);
                 }
             });
         }).start();
@@ -328,9 +472,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-
     private String combineMoods(String quizMood, String faceEmotion) {
-        // Zabezpieczenie przed null/empty dla quizMood
         if (quizMood == null || quizMood.isEmpty()) {
             return faceEmotion != null ? faceEmotion : "Nie określono";
         }
@@ -339,18 +481,32 @@ public class MainActivity extends AppCompatActivity {
             return quizMood;
         }
 
-        // Normalizacja Stringów
         String lowerFaceEmotion = faceEmotion.toLowerCase().trim();
         String lowerQuizMood = quizMood.toLowerCase().trim();
 
-        if (lowerFaceEmotion.contains("radosn") && lowerQuizMood.contains("szczęśliwy")) {
-            return "Bardzo szczęśliwy";
+        if (lowerFaceEmotion.contains("radosn") && lowerQuizMood.contains("szczęśliwy/a")) {
+            return "Bardzo szczęśliwy/a";
         }
-        if (lowerFaceEmotion.contains("smutn") && lowerQuizMood.contains("smutny")) {
-            return "Wyraźnie smutny";
+        if (lowerFaceEmotion.contains("smutn") && lowerQuizMood.contains("smutny/a")) {
+            return "Wyraźnie smutny/a";
+        }
+        if (lowerFaceEmotion.contains("zł") && lowerQuizMood.contains("zły/a")) {
+            return "Bardzo zły/a";
+        }
+        if (lowerFaceEmotion.contains("neutraln") && lowerQuizMood.contains("neutralny/a")) {
+            return "Stabilny/a neutralny/a";
         }
 
         return quizMood + " (" + faceEmotion + ")";
+    }
+
+    private void showExitConfirmationDialog() {
+        new AlertDialog.Builder(this)
+                .setTitle("Zakończ ankietę")
+                .setMessage("Czy na pewno chcesz zakończyć ankietę? Twoje odpowiedzi zostaną utracone.")
+                .setPositiveButton("Tak", (dialog, which) -> resetQuestionnaire())
+                .setNegativeButton("Nie", (dialog, which) -> dialog.dismiss())
+                .show();
     }
 
     private static class SpotifyTrack {

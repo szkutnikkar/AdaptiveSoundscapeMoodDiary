@@ -65,13 +65,27 @@ public class FaceEmotionDetector {
         float leftEyeOpenProb = face.getLeftEyeOpenProbability() != null ? face.getLeftEyeOpenProbability() : 0f;
         float rightEyeOpenProb = face.getRightEyeOpenProbability() != null ? face.getRightEyeOpenProbability() : 0f;
 
-        if (smileProb > 0.7f) {
-            return "Radosna";
-        } else if (smileProb < 0.3f && leftEyeOpenProb < 0.3f && rightEyeOpenProb < 0.3f) {
-            return "Zmęczona";
-        } else if (smileProb < 0.3f) {
-            return "Smutna";
+        // Wykrywanie złości - gdy oczy są szeroko otwarte, a uśmiech minimalny
+        if (smileProb < 0.15f && leftEyeOpenProb > 0.8f && rightEyeOpenProb > 0.8f) {
+            return "Zły/a";
         }
-        return "Neutralna";
+        // Wykrywanie radości
+        else if (smileProb > 0.7f) {
+            return "Radosny/a";
+        }
+        // Wykrywanie zmęczenia
+        else if (smileProb < 0.3f && leftEyeOpenProb < 0.3f && rightEyeOpenProb < 0.3f) {
+            return "Zmęczony/a";
+        }
+        // Wykrywanie smutku
+        else if (smileProb < 0.3f) {
+            return "Smutny/a";
+        }
+        // Wykrywanie neutralnego wyrazu - gdy wartości są pośrednie
+        else if (smileProb >= 0.3f && smileProb <= 0.6f) {
+            return "Neutralny/a";
+        }
+
+        return "Neutralny/a"; // Domyślnie zwracamy neutralną
     }
 }

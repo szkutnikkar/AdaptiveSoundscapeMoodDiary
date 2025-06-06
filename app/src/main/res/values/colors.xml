@@ -1,10 +1,42 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="purple_200">#8C7AE6</color>
-    <color name="purple_500">#5D54A4</color>
-    <color name="purple_700">#3B3B98</color>
-    <color name="teal_200">#4ECDC4</color>
-    <color name="teal_700">#1A535C</color>
-    <color name="black">#000000</color>
-    <color name="white">#FFFFFF</color>
+    <!-- Material Design 3 Colors - Weightless Theme -->
+    <color name="primary">#8E9AAF</color>
+    <color name="primary_variant">#748CAB</color>
+    <color name="secondary">#CBC0D3</color>
+    <color name="secondary_variant">#DEE2FF</color>
+    <color name="background">#F8F7FF</color>
+    <color name="surface">#FFFFFF</color>
+    <color name="error">#EFD3D7</color>
+    <color name="on_primary">#FFFFFF</color>
+    <color name="on_secondary">#2B2D42</color>
+    <color name="on_background">#2B2D42</color>
+    <color name="on_surface">#2B2D42</color>
+    <color name="on_error">#8C4646</color>
+    <color name="card_background">#FFFFFF</color>
+    <color name="text_primary">#2B2D42</color>
+    <color name="text_secondary">#8D99AE</color>
+    <color name="surface_variant">#EDF2F4</color>
+    <color name="outline">#D0D1D5</color>
+    <color name="ripple">#1A8E9AAF</color>
+
+    <!-- Accent Colors - Soft Pastels -->
+    <color name="accent_purple">#CBC0D3</color>
+    <color name="accent_teal">#B8D8D8</color>
+    <color name="accent_green">#A7D7C5</color>
+    <color name="accent_red">#F7CAC9</color>
+
+    <!-- Legacy Colors (for backward compatibility) -->
+    <color name="accent">@color/primary</color>
+    <color name="card_dark">@color/card_background</color>
+    <color name="accent_secondary">@color/secondary</color>
+    <color name="background_dark">@color/background</color>
+
+    <!-- System Colors -->
+    <color name="purple_500">@color/primary</color>
+    <color name="purple_700">@color/primary_variant</color>
+    <color name="teal_200">@color/accent_teal</color>
+    <color name="teal_700">#5C9B9B</color>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
 </resources>
